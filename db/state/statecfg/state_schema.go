@@ -188,8 +188,9 @@ func (s *SchemaGen) GetBlockIdxFilesCfg(name string) BlockIdxFilesCfg {
 }
 
 // ExperimentalParallelCommitment toggles the ParallelPatriciaHashed trie path
-// (commitment.ModeParallel + VariantParallelHexPatricia). Default false.
-var ExperimentalParallelCommitment = false
+// (commitment.ModeParallel + VariantParallelHexPatricia). Default false; the
+// COMMITMENT_PARALLEL env var (or the CLI flag) turns it on.
+var ExperimentalParallelCommitment = dbg.EnvBool("COMMITMENT_PARALLEL", false)
 
 // ExperimentalStreamingCommitment toggles the StreamingCommitter trie path
 // (commitment.ModeParallel + VariantStreamingHexPatricia), which overlaps
