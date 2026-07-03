@@ -38,7 +38,6 @@
 - shard: blocktests-devnet
   workers: 12
   max-allowed-failures: 0
-  commitment-parallel: true
 - shard: enginextests-stable-sequential
   workers: 8
   max-allowed-failures: 0
@@ -126,7 +125,6 @@
 - shard: blocktests-devnet-race-amsterdam
   workers: 12
   max-allowed-failures: 0
-  commitment-parallel: true
 - shard: zkevm-witness-race
   workers: 8
   max-allowed-failures: 0
