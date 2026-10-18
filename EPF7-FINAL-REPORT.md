@@ -12,7 +12,7 @@ Author: Chen Can (Jack CC, [@JackCC703](https://github.com/JackCC703)) · Mentor
 
 This project built the Erigon-side foundations for EIP-7807, which proposes replacing the RLP-encoded execution block with an SSZ representation. Work followed the proposal in four phases: field mapping, progressive SSZ Merkleization primitives, a payload adapter that computes the EIP-7807 block root from existing Erigon block data, and — covered by this report — generalized index mappings, Merkle proof generation, and a reproducible local demonstration.
 
-The payload adapter produces a root that agrees with an independent remerkleable implementation. Three progressive SSZ components were merged into Erigon. The EIP-7807 adapter PR itself was not merged because the EIP was declined for inclusion, a protocol-scope decision unrelated to the code. The proof and demonstration work therefore completes on a local branch, as the proposal anticipated when it allowed local fixture tooling instead of an RPC surface.
+The payload adapter produces a root that agrees with an independent remerkleable implementation. Three progressive SSZ components were merged into Erigon. The EIP-7807 adapter PR itself was not merged because the EIP was declined for inclusion, a protocol-scope decision unrelated to the code. The proof and demonstration work therefore completes on a public branch of the author's Erigon fork, as the proposal anticipated when it allowed local fixture tooling instead of an RPC surface.
 
 ## 1. Context
 
@@ -33,7 +33,7 @@ The project deliberately did not replace Erigon's consensus-critical block hash 
 | 1 | EIP-7807 → Erigon field mapping and adapter boundary | Complete |
 | 2 | Progressive SSZ primitives required by the layout | Complete, 3 PRs merged |
 | 3 | Payload adapter and EIP-7807 block root | Complete, PR closed on protocol decision after approval and green CI |
-| 4 | Generalized indices, proof generation, reproducible demonstration | Complete on a local branch |
+| 4 | Generalized indices, proof generation, reproducible demonstration | Complete, published on a public fork branch |
 | 5 | Final report and presentation | This document |
 
 ### Merged upstream
@@ -51,7 +51,7 @@ Two further PRs ([#22528](https://github.com/erigontech/erigon/pull/22528), [#23
 | Work | Location |
 | --- | --- |
 | EIP-7807 payload adapter and root | [#23854](https://github.com/erigontech/erigon/pull/23854), closed |
-| Generalized indices, proofs, demo | local branch `eip-7807-payload-root` |
+| Generalized indices, proofs, demo | branch `eip7807-demo` of the [author's fork](https://github.com/JackCC703/erigon/tree/eip7807-demo) |
 
 ## 3. Phase 1 — Field mapping
 
@@ -179,10 +179,18 @@ Go-side coverage is 12 tests across the two packages: generalized indices for al
 - The fixture is one deterministic block, not conformance coverage over mainnet or spec-test blocks. It pins the layout and the derivation; it does not prove the adapter handles every historical block shape.
 - No RPC surface was built. The proposal allowed local fixture tooling in that case, which is what phase 4 delivers.
 - The EIP-7807 root is parallel to Erigon's canonical block hash. It is not wired into the import path, `BLOCKHASH`, or the p2p block hash, which was out of scope by design.
-- Phase 4 lives on a local branch rather than upstream. Reproducibility rests on the demo script and pinned references, not on a merged artifact.
+- Phase 4 is published on a branch of a personal fork rather than upstream. Reproducibility rests on that branch, the demo script, and pinned references, not on a merged artifact.
 - Engine API SSZ transport and SSZ query-language consumers were named as related work in the proposal and remain untouched.
 
-**Reproducibility note.** The demo sits in an untracked `dev/` directory in a local worktree. A reader who wants to run it needs the branch and that directory; it is not reachable from a clean clone of `erigontech/erigon`. `verify.sh` is self-contained otherwise: it builds the venv and clones remerkleable at the pinned commit on first run.
+**Reproducibility.** The work is published on the `eip7807-demo` branch of the author's fork, so it is reachable from a clean clone:
+
+```sh
+git clone --branch eip7807-demo https://github.com/JackCC703/erigon.git erigon-demo
+cd erigon-demo
+./dev/eip7807demo/verify.sh
+```
+
+`verify.sh` is self-contained: it runs the Go tests, generates the report, builds the Python venv, and clones remerkleable at the pinned commit on first run. It requires Go, Python 3.11+, and network access for that one clone.
 
 **Trade-off behind the demo's shape.** The demo uses Erigon's real adapter over a real `BlockWithReceipts` rather than a standalone reimplementation of the SSZ types. This is the stronger choice for credibility — the root comes from production-shaped code — and it is what let the `extra_data` bug surface in shared logic rather than in a toy copy. The cost is coupling: the demo lives inside the erigon module, so it cannot be lifted into a separate repository without carrying the adapter with it. Given that the adapter is the artifact worth demonstrating, that coupling was accepted deliberately.
 
@@ -208,9 +216,9 @@ Working with maintainers also taught me to separate a PR's fate from its quality
 | Field mapping document | [Phase 1 mapping](https://hackmd.io/@jackcc/epf7-project-draft) |
 | Merged primitives | #22446, #22689, #22783 |
 | Payload adapter and root | #23854, closed |
-| Demo, indices, proofs | branch `eip-7807-payload-root`, `dev/eip7807demo` |
-| One-command reproduction | `./dev/eip7807demo/verify.sh` |
-| Independent verification | `dev/eip7807demo/verify/verify.py` |
+| Demo, indices, proofs | [`eip7807-demo` branch](https://github.com/JackCC703/erigon/tree/eip7807-demo), `dev/eip7807demo` |
+| One-command reproduction | `./dev/eip7807demo/verify.sh` on that branch |
+| Independent verification | `dev/eip7807demo/verify/verify.py` on that branch |
 
 ## Appendix — Generalized index table
 
