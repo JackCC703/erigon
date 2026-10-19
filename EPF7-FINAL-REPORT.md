@@ -5,6 +5,7 @@
 Author: Chen Can (Jack CC, [@JackCC703](https://github.com/JackCC703)) · Mentors: RazorClient, Etan Kissling
 
 - Proposal: [erigon-ssz-execution-blocks-eip-7807.md](https://github.com/eth-protocol-fellows/cohort-seven/blob/main/projects/erigon-ssz-execution-blocks-eip-7807.md)
+- Final report (HackMD): https://hackmd.io/@jackcc/epf7-finalreport
 - Design document: https://hackmd.io/@jackcc/epf7-project-draft
 - EIP: [EIP-7807 — SSZ execution blocks](https://eips.ethereum.org/EIPS/eip-7807) (author: Etan Kissling)
 
