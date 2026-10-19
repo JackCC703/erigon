@@ -12,7 +12,7 @@ Author: Chen Can (Jack CC, [@JackCC703](https://github.com/JackCC703)) · Mentor
 
 This project built the Erigon-side foundations for EIP-7807, which proposes replacing the RLP-encoded execution block with an SSZ representation. Work followed the proposal in four phases: field mapping, progressive SSZ Merkleization primitives, a payload adapter that computes the EIP-7807 block root from existing Erigon block data, and — covered by this report — generalized index mappings, Merkle proof generation, and a reproducible local demonstration.
 
-The payload adapter produces a root that agrees with an independent remerkleable implementation. Three progressive SSZ components were merged into Erigon. The EIP-7807 adapter PR itself was not merged because the EIP was declined for inclusion, a protocol-scope decision unrelated to the code. The proof and demonstration work therefore completes on a public branch of the author's Erigon fork, as the proposal anticipated when it allowed local fixture tooling instead of an RPC surface.
+The payload adapter produces a root that agrees with an independent remerkleable implementation. Three progressive SSZ components were merged into Erigon. The EIP-7807 adapter PR was approved and then closed when the EIP was declined for inclusion. The proof and demonstration work is published on a public branch of the author's Erigon fork as a local command-line tool.
 
 ## 1. Context
 
@@ -24,7 +24,7 @@ Ethereum uses two different commitment schemes across its layers. The Consensus 
 
 Erigon was the target because it already carries real SSZ infrastructure in Caplin and `cl/merkle_tree`, while its canonical execution block model remains RLP/MPT-oriented. The missing piece was an explicit, tested mapping from Erigon execution data to the EIP-7807 layout, plus the progressive Merkleization, root computation, generalized indices, and proof generation needed to inspect and verify that layout.
 
-The project deliberately did not replace Erigon's consensus-critical block hash or import path. It built a parallel EIP-7807 root and proof surface that can be reviewed before any deeper integration.
+The project builds a parallel EIP-7807 root and proof surface next to Erigon's existing block hash and import path.
 
 ## 2. Deliverables and status
 
@@ -46,7 +46,7 @@ The project deliberately did not replace Erigon's consensus-critical block hash 
 
 Two further PRs ([#22528](https://github.com/erigontech/erigon/pull/22528), [#23130](https://github.com/erigontech/erigon/pull/23130)) covered the EIP-7495 active-fields mix-in and `ProgressiveContainer` root. Both were superseded by [#22912](https://github.com/erigontech/erigon/pull/22912) (`cl: support Gloas alpha.12 progressive SSZ and spectests`), which landed the same functionality along with the spec tests, so they were closed rather than merged. The outcome is the same code in `cl/merkle_tree`; only the review path changed.
 
-### Not upstream, by design
+### Published outside upstream
 
 | Work | Location |
 | --- | --- |
@@ -92,7 +92,7 @@ The final fixture root is:
 0x51951516710af90e8c20092e086f37232c69b558d6ba0035333982e115e1f627
 ```
 
-PR #23854 carried the adapter and root with this pinned fixture. It was reviewed and approved with green CI, then closed because EIP-7807 was declined for inclusion at ACDE #245. The PR is a complete, tested artifact; the close is a scope decision about the protocol, not a finding against the implementation.
+PR #23854 carried the adapter and root with this pinned fixture. It was reviewed and approved with green CI, then closed when EIP-7807 was declined for inclusion at ACDE #245.
 
 ## 6. Phase 4 — Generalized indices, proofs, and demonstration
 
@@ -170,19 +170,9 @@ Pinned references: EIP-7807 at blob `3f2dc991ac65153842fd9b894c04ba590d58d3e6`, 
 
 Go-side coverage is 12 tests across the two packages: generalized indices for all 18 fields, index stability under growth, the mix-in arithmetic, the `extra_data` length regression, proofs folding back to the root for every field, out-of-range indices, tampered branches, and truncated branches.
 
-## 8. Outcome and limitations
+## 8. Reproducibility
 
-**On the EIP.** EIP-7807 was declined for inclusion, so the adapter PR closed. The project's success criteria were implementation quality and reproducibility, with merging explicitly not required when a maintainer declines an RPC surface. By that standard the work stands: the root is reproducible and independently verified, the progressive primitives are merged upstream, and phase 4 completes as a research prototype.
-
-**What is not claimed.**
-
-- The fixture is one deterministic block, not conformance coverage over mainnet or spec-test blocks. It pins the layout and the derivation; it does not prove the adapter handles every historical block shape.
-- No RPC surface was built. The proposal allowed local fixture tooling in that case, which is what phase 4 delivers.
-- The EIP-7807 root is parallel to Erigon's canonical block hash. It is not wired into the import path, `BLOCKHASH`, or the p2p block hash, which was out of scope by design.
-- Phase 4 is published on a branch of a personal fork rather than upstream. Reproducibility rests on that branch, the demo script, and pinned references, not on a merged artifact.
-- Engine API SSZ transport and SSZ query-language consumers were named as related work in the proposal and remain untouched.
-
-**Reproducibility.** The work is published on the `eip7807-demo` branch of the author's fork, so it is reachable from a clean clone:
+The work is published on the `eip7807-demo` branch of the author's fork:
 
 ```sh
 git clone --branch eip7807-demo https://github.com/JackCC703/erigon.git erigon-demo
@@ -190,15 +180,15 @@ cd erigon-demo
 ./dev/eip7807demo/verify.sh
 ```
 
-`verify.sh` is self-contained: it runs the Go tests, generates the report, builds the Python venv, and clones remerkleable at the pinned commit on first run. It requires Go, Python 3.11+, and network access for that one clone.
+`verify.sh` runs the Go tests, generates the report, builds the Python venv, and clones remerkleable at the pinned commit on first run. It requires Go, Python 3.11+, and network access for that one clone.
 
-**Trade-off behind the demo's shape.** The demo uses Erigon's real adapter over a real `BlockWithReceipts` rather than a standalone reimplementation of the SSZ types. This is the stronger choice for credibility — the root comes from production-shaped code — and it is what let the `extra_data` bug surface in shared logic rather than in a toy copy. The cost is coupling: the demo lives inside the erigon module, so it cannot be lifted into a separate repository without carrying the adapter with it. Given that the adapter is the artifact worth demonstrating, that coupling was accepted deliberately.
+The demo uses Erigon's real adapter over a real `BlockWithReceipts`, so the root it prints comes from the same code path that was reviewed in #23854.
 
 ## 9. Next steps
 
 1. If EIP-7807 or an equivalent SSZ block commitment returns to scope, the adapter and the index table are directly reusable; the work to redo is the encoding path, not the Merkleization analysis.
 2. The generalized index table is the missing input for any independent verifier — a contract or light client can consume it without reimplementing progressive container Merkleization.
-3. Field proofs open a path to a verifiable RPC: a client could request one field plus a branch instead of a full block. That requires the transport layer this project left untouched.
+3. Field proofs open a path to a verifiable RPC: a client could request one field plus a branch instead of a full block.
 4. Broadening coverage from one fixture to a corpus of historical blocks would turn the adapter from validated to exercised.
 
 ## 10. Experience
@@ -206,8 +196,6 @@ cd erigon-demo
 The most useful thing I learned is how narrow the gap is between *internally consistent* and *correct*. The `extra_data` bug passed every check I had written, because I had written the checks against the same understanding as the code. Only a genuinely independent implementation exposed it. Etan's remerkleable was that independent implementation, and having the EIP author's reference to measure against changed the character of the work from "my code agrees with my tests" to "two independent implementations agree."
 
 The second lesson is about reading specifications instead of inferring them. My first generalized index table was a reasonable guess and it was wrong; the specification and the reference implementation both said so within minutes of being consulted. Deriving the answer from the normative source and then confirming it against an independent implementation is a slower first pass and a much faster total path.
-
-Working with maintainers also taught me to separate a PR's fate from its quality. #23854 was approved with green CI and closed because the protocol decision moved — the same close that says nothing about the implementation. Learning to read that distinction, and to state it plainly rather than either overclaiming or apologizing, is part of the work.
 
 ## 11. Artifacts
 
