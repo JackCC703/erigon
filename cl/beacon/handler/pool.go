@@ -372,7 +372,10 @@ func (a *ApiHandler) PostEthV1BeaconPoolAttesterSlashings(w http.ResponseWriter,
 		beaconhttp.NewEndpointError(http.StatusBadRequest, err).WriteTo(w)
 		return
 	}
-	if err := a.forkchoiceStore.OnAttesterSlashing(req, false); err != nil && !errors.Is(err, forkchoice.ErrIgnore) {
+	if err := a.forkchoiceStore.OnAttesterSlashing(req, false); errors.Is(err, forkchoice.ErrIgnore) {
+		w.WriteHeader(http.StatusOK)
+		return
+	} else if err != nil {
 		beaconhttp.NewEndpointError(http.StatusBadRequest, err).WriteTo(w)
 		return
 	}

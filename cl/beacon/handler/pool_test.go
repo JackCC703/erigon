@@ -42,6 +42,7 @@ import (
 	clgossip "github.com/erigontech/erigon/cl/gossip"
 	"github.com/erigontech/erigon/cl/phase1/core/state"
 	"github.com/erigontech/erigon/cl/phase1/core/state/raw"
+	"github.com/erigontech/erigon/cl/phase1/forkchoice"
 	mock_services2 "github.com/erigontech/erigon/cl/phase1/forkchoice/mock_services"
 	"github.com/erigontech/erigon/cl/phase1/network/gossip"
 	gossip_mock "github.com/erigontech/erigon/cl/phase1/network/gossip/mock_services"
@@ -53,6 +54,62 @@ import (
 	"github.com/erigontech/erigon/common/log/v3"
 	chainspec "github.com/erigontech/erigon/execution/chain/spec"
 )
+
+type attesterSlashingStore struct {
+	forkchoice.ForkChoiceStorage
+	onAttesterSlashing func(*cltypes.AttesterSlashing, bool) error
+}
+
+func (s *attesterSlashingStore) OnAttesterSlashing(slashing *cltypes.AttesterSlashing, test bool) error {
+	return s.onAttesterSlashing(slashing, test)
+}
+
+func TestPoolAttesterSlashingPublication(t *testing.T) {
+	for _, tc := range []struct {
+		name         string
+		err          error
+		status       int
+		publishCalls int
+	}{
+		{name: "validated", status: http.StatusOK, publishCalls: 1},
+		{name: "ignored", err: forkchoice.ErrIgnore, status: http.StatusOK},
+		{name: "wrapped ignore", err: fmt.Errorf("already seen: %w", forkchoice.ErrIgnore), status: http.StatusOK},
+		{name: "invalid", err: errors.New("invalid attester slashing"), status: http.StatusBadRequest},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			clock := eth_clock.NewMockEthereumClock(ctrl)
+			clock.EXPECT().GetCurrentEpoch().Return(uint64(0)).Times(1)
+			slashing := cltypes.NewAttesterSlashing(clparams.Phase0Version)
+			body, err := json.Marshal(slashing)
+			require.NoError(t, err)
+			encoded, err := slashing.EncodeSSZ(nil)
+			require.NoError(t, err)
+			publisher := gossip_mock.NewMockGossip(ctrl)
+			publisher.EXPECT().Publish(gomock.Any(), clgossip.TopicNameAttesterSlashing, encoded).Return(nil).Times(tc.publishCalls)
+			calls := 0
+			store := &attesterSlashingStore{onAttesterSlashing: func(req *cltypes.AttesterSlashing, test bool) error {
+				calls++
+				require.Equal(t, slashing, req)
+				require.False(t, test)
+				return tc.err
+			}}
+			handler := &ApiHandler{
+				logger:          log.Root(),
+				beaconChainCfg:  &clparams.MainnetBeaconConfig,
+				ethClock:        clock,
+				forkchoiceStore: store,
+				sentinel:        &nonNilSentinelClient{},
+				gossipManager:   publisher,
+			}
+			recorder := httptest.NewRecorder()
+			request := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/eth/v1/beacon/pool/attester_slashings", bytes.NewReader(body))
+			handler.PostEthV1BeaconPoolAttesterSlashings(recorder, request)
+			require.Equal(t, tc.status, recorder.Code)
+			require.Equal(t, 1, calls)
+		})
+	}
+}
 
 func TestPoolAttesterSlashings(t *testing.T) {
 	attesterSlashing := cltypes.NewAttesterSlashing(clparams.DenebVersion)
